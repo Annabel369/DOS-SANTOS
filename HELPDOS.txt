@@ -1,193 +1,66 @@
-http://192.168.100.49/select?id=-2
+================================================================================
+                    GUIA TÉCNICO: MELLANOX CONNECTX-3 PRO NO MS-DOS
+================================================================================
 
-Mellanox ConnectX-3 Pro 40 Gb Ethernet PCIe CX314A MCX314A-BCCT 40 Gb Ethernet 40 Gb de Rede MPO Cabo de Fibra Óptica
+Este documento serve como manual e registro de pesquisa para a implementação
+de suporte à rede 10GbE / 40GbE usando placas Mellanox PCIe em ambiente MS-DOS.
 
-na minha casa so tem o cabo de fibra que pasa ao meu quarto por ser mas fino e platico tem como nos baixar um compilador assemble para nos desenvolver um drive generico para 1. Ausência de Drivers Nativos
-  Mellanox para DOS:
-    A Mellanox ConnectX-3 Pro é uma placa moderna PCIe
-▸ Thought for 1s, 1.2k tokens
-  Considering the Limitations
-  I will check if the Netwide Assembler (nasm) is already installed on your Debian system, or if we can install it. This is a very popular assembler that can compile 16-bit real-mode code for MS-DOS.
+--------------------------------------------------------------------------------
+1. O DESAFIO: DRIVERS NATIVOS PARA PLACAS DE ALTA PERFORMANCE
+--------------------------------------------------------------------------------
+Escrever um driver de rede em Assembly para a Mellanox ConnectX-3 Pro no MS-DOS
+nativo (Modo Real de 16 bits) é um desafio técnico monumental por dois motivos:
 
-● Bash(nasm -v) (ctrl+o to expand)
+A. Mapeamento de Memória (64-bit BARs):
+   O MS-DOS roda em Modo Real, que limita o acesso físico a apenas 1 MB (limite 
+   de 640 KB convencionais). Placas de rede PCIe modernas mapeiam seus 
+   registradores (MMIO via PCI BARs) em endereços físicos de 64 bits de alta 
+   memória (frequentemente acima de 4 GB). Acessar isso no DOS requer chaveamento 
+   complexo para Modo Protegido ou o uso do Unreal Mode (Modo Irreal).
 
-▸ Thought for 1s, 1.3k tokens
-  Confirming NASM Availability
-  I will create a 16-bit MS-DOS Assembly program (pci_scan.asm) in /media/astral/5D0B-0163/esp_test/pci_scan.asm. This program uses the Netwide Assembler (nasm) to compile into a .COM executable. When run in
-  MS-DOS, it queries the PCI BIOS (using Interrupt 0x1A) to detect if the Mellanox network card (Vendor ID 0x15B3) is present on the PCI bus, printing its Bus and Device/Function coordinates. This is a
-  practical starting point for low-level assembly development for PCI hardware in DOS.
+B. Arquitetura Complexa (QPs e CQs):
+   As placas antigas (RTL8139 ou NE2000) possuíam portas de I/O simples e buffers
+   circulares. A Mellanox exige o estabelecimento de "Queue Pairs" (Envio/Recepção),
+   "Completion Queues", comandos em Mailbox e paginação de memória complexa. O 
+   driver oficial do Linux possui dezenas de milhares de linhas para essa 
+   inicialização.
 
-● Edit(/media/astral/5D0B-0163/esp_test/pci_scan.asm) (ctrl+o to expand)
+--------------------------------------------------------------------------------
+2. FERRAMENTA: SCANNER PCI (pci_scan.com)
+--------------------------------------------------------------------------------
+Para facilitar o desenvolvimento, construímos o "PCI Scanner". Este utilitário 
+conversa diretamente com a BIOS PCI do computador através da Interrupção de 
+hardware 0x1A (função 0xB102).
 
-  I will compile the Assembly code (pci_scan.asm) under Linux using the Netwide Assembler (nasm), generating the direct DOS executable PCI_SCAN.COM in the same directory. This way, you can run it immediately
-  upon booting into MS-DOS.
-
-● Bash(nasm -f bin -o /media/astral/5D0B-0163/esp_test/pci_scan.com /media/astral/5D0B-0163/esp_test/pci_scan.asm) (ctrl+o to expand)
-
-▸ Thought for 6s, 814 tokens
-  Verifying File Output
-  Escrever um driver de rede em Assembly para a Mellanox ConnectX-3 Pro em MS-DOS nativo (Modo Real de 16 bits) é um desafio técnico monumental.
-
-  Embora o seu cenário exija o uso da Mellanox (devido ao cabo de fibra MPO ser o único cabo que passa para o seu quarto), o desenvolvimento de um driver em modo real para essa placa é praticamente inviável
-  para um desenvolvedor solo no curto/médio prazo. Abaixo eu explico o porquê de forma detalhada e, logo em seguida, apresento a solução ideal para o seu problema e o seu primeiro programa em Assembly para
-  DOS.
-  ──────
-  ### Por que desenvolver um driver DOS para Mellanox é extremamente complexo?
-
-  1. Mapeamento de Memória Física (64-bit BARs):
-  O MS-DOS roda em Modo Real de 16 bits, o que limita o acesso direto à memória a apenas 1 MB (limite de 640 KB convencionais). As placas de rede PCIe modernas como a ConnectX-3 mapeiam seus registradores de
-  controle (MMIO via PCI BARs) em endereços físicos de 64 bits de alta memória (geralmente acima de 4 GB). Para o DOS ler ou escrever nesses registradores, o programa precisaria chavear constantemente para o
-  Modo Protegido (como DPMI) ou usar o chamado Unreal Mode (Modo Irreal), o que adiciona enorme complexidade.
-  2. Arquitetura de Filas e Mailboxes:
-  Placas antigas (como a Realtek RTL8139 ou NE2000) possuíam registradores simples de I/O e buffers circulares fáceis de programar. A Mellanox ConnectX-3 Pro é um dispositivo de altíssima performance que
-  funciona por meio de Queue Pairs (QP) (Pares de Filas de Envio/Recepção), Completion Queues (CQ) (Filas de Conclusão), Mailboxes de comandos de firmware e tabelas de páginas de tradução de memória física.
-  O driver Linux para ela (mlx4_core e mlx4_en) possui dezenas de milhares de linhas de código C complexas apenas para inicializar a firmware e estabelecer as filas de comunicação. Reescrever isso em Assembly
-  de 16 bits é uma tarefa de nível de engenharia de sistemas de grande porte.
-  ──────
-  ### A Solução Ideal: Hypervisor Leve Linux + MS-DOS Emulado
-
-  Como você já tem o Debian 13 instalado e a placa Mellanox ConnectX-3 Pro está ativa e funcionando perfeitamente a 10G/40G (enp6s0d1 com IP 192.168.100.173), você não precisa escrever um driver do zero para
-  ter rede no DOS.
-
-  Você pode configurar um boot rápido automatizado no seu Debian que inicia uma máquina virtual leve (via QEMU/KVM) rodando o seu MS-DOS:
-
-  1. O Linux (Debian) inicializa em poucos segundos, carrega o driver nativo da Mellanox (mlx4_en) e cria uma ponte de rede (bridge).
-  2. O QEMU inicia o MS-DOS emulando uma placa de rede clássica, como a Intel PRO/1000 ou NE2000.
-  3. Dentro do MS-DOS, você carrega os drivers de rede DOS oficiais e prontos dessas placas emuladas (E1000.DOS ou NE2000.COM).
-  4. A máquina virtual redireciona o tráfego da placa emulada diretamente para a fibra de 40 Gb/s da Mellanox.
-  5. Resultado: Você terá um prompt de MS-DOS puro na tela, inicializado em menos de 15 segundos, com acesso total à rede via fibra óptica, sem precisar escrever nenhuma linha de driver de rede complexo.
-  ──────
-  ### 🛠️ Seu Primeiro Programa em Assembly DOS: Scanner PCI Mellanox
-
-  Para ajudar no seu aprendizado de Assembly e no entendimento de como o DOS enxerga o seu hardware, eu criei e compilei um programa em Assembly de 16 bits usando o nasm (que já está instalado no seu Debian).
-
-  Escrevi o código em:
-
-  • Código Fonte: pci_scan.asm
-  • Executável compilado para DOS: pci_scan.com (já salvo no seu drive).
-
-  #### O que este programa faz?
-
-  Ele conversa diretamente com a BIOS PCI do computador através da Interrupção de hardware 0x1A (função 0xB102). Ele varre o barramento PCI procurando pelo identificador de fabricante (Vendor ID = 0x15B3, que
-  pertence à Mellanox) e exibe em qual endereço físico de barramento (Bus e Device/Function) a placa está conectada.
-
-  #### Como testar no MS-DOS:
-
-  1. Dê boot pelo seu drive MS-DOS.
-  2. Acesse a pasta do teste:
-    CD \ESP_TEST
-
-  3. Execute o programa compilado:
-    PCI_SCAN.COM
-
-  4. Se o DOS conseguir acessar o barramento PCI da placa mãe, ele retornará se a Mellanox foi detectada e as suas coordenadas de barramento (ex: Bus: 0x06 | Device/Function: 0x00).
-
-  #### Como compilar novos programas Assembly a partir do Linux:
-
-  Você pode escrever o código Assembly no Linux e compilar diretamente para o drive usando o nasm instalado no Debian:
-
-    nasm -f bin -o /media/astral/5D0B-0163/esp_test/meu_prog.com meu_prog.asm
-    
-    
-    etapa2 
-    
-    
-      Com base no log que você compartilhou, o programa original não encontrou a
-  placa Mellanox ConnectX-3 usando os Device IDs específicos (1003h ou
-  1007h). Isso pode acontecer por dois motivos principais:
-  1. A placa está em outro modo ou usa um Device ID diferente (por exemplo,
-  modo InfiniBand vs Ethernet, ou outra variante do firmware).
-  2. A placa não está sendo detectada fisicamente pelo barramento PCI da
-  placa-mãe (problema de mau contato, slot PCIe inativo, ou falta de suporte
-  no setup da BIOS).
-  Para ajudar a resolver esse problema e tornar a ferramenta muito mais
-  informativa, eu reescrevi e recompilei o pci_scan.asm para transformá-lo em
-  um Scanner de Barramento PCI Completo.
-
-  ### 🛠️ O que mudou no novo programa?
-
-  • Varredura Completa: Ele agora varre todas as 256 portas de barramento
-  (Bus), 32 dispositivos (Device) e 8 funções (Function) possíveis usando a
-  BIOS PCI.
-  • Tabela de Dispositivos: Ele gera uma listagem formatada em tempo real com
-  todos os dispositivos ativos encontrados na máquina.
-  • Leitura de Class Code: Além do Vendor ID e Device ID, ele lê a classe do
-  dispositivo (ex: 0200 para controladores de rede ethernet, 0300 para placas
-  de vídeo).
-  • Filtro Inteligente Mellanox: Ele ainda busca automaticamente pelo Vendor
-  ID da Mellanox (15B3h). Se encontrar qualquer placa da marca (independente
-  do Device ID), ele destaca a linha com um asterisco * e [MELLANOX].
-  • Paginação Inteligente: Se houver mais de 22 dispositivos (o que faria a
-  tela do DOS rolar), o programa pausa e exibe -- Pressione qualquer tecla
-  para continuar --, limpando a linha do aviso em seguida para manter a
-  visualização limpa.
-  ──────
-  ### 📝 O Código Assembly Atualizado (pci_scan.asm)
-
-  O código-fonte foi atualizado diretamente no seu pendrive com as seguintes
-  otimizações:
-
-  • Detecção de Dispositivos Multi-função: Ele verifica primeiro a Função 0.
-  Se o slot estiver vazio, ele pula imediatamente as funções 1-7, fazendo com
-  que a varredura completa termine em menos de 0.2 segundos.
-  • Conversor Decimal & Hexadecimal: Funções auxiliares em Assembly para
-  formatar a tabela no terminal do DOS.
-  ──────
-  ### 🚀 Como testar no seu MS-DOS:
-
-  1. Dê boot na sua máquina MS-DOS.
-  2. Acesse a pasta:
-    CD \ESP_TEST
-
-  3. Execute o novo utilitário compilado:
-    PCI_SCAN.COM
-
-
-  ### 🔍 Como analisar o resultado:
-
-  • Se a placa Mellanox aparecer na lista: O programa mostrará o endereço
-  (Bus/Dev/Func) e você poderá ver exatamente qual é o Device ID dela
-  (segunda coluna de IDs). Assim, saberemos o ID correto para configurar os
-  drivers do DOS.
-  • Se a placa NÃO aparecer na lista: Significa que nem mesmo a BIOS da
-  placa-mãe está expondo a placa para o sistema operacional de 16 bits (DOS).
-  Nesse caso, pode ser necessário verificar o slot físico, limpar os contatos
-  da placa com borracha, ou alterar configurações de PCIe/Plug-and-Play na
-  BIOS da sua placa-mãe.
+* O que ele faz:
+  - Varre as 256 portas de barramento (Bus), 32 dispositivos (Device) e 8 funções
+    possíveis.
+  - Se encontra a Vendor ID 0x15B3 (Mellanox), ele sinaliza com um destaque
+    na tela e mostra os parâmetros exatos da placa.
   
-  
-  parte 3 
-  
-  ▸ Thought for 3s, 2.6k tokens
-  Confirming Assembly Focus
-  I will create a complete, compile-ready Assembly skeleton for the DOS Packet Driver (mlx_pkt.asm) on the USB drive. This code implements a standard Terminate and Stay Resident (TSR) packet driver
-  architecture for DOS, hooks the software interrupt vector, searches the system memory for the !PXE installation structure left by Mellanox FlexBoot, and retrieves the entry point to the hardware's UNDI
-  interface.
+* Como usar no MS-DOS:
+  Basta executar PCI_SCAN.COM no prompt. Se a placa não aparecer na lista, a 
+  BIOS da placa-mãe não está ativando as rotas PCIe adequadas para o ambiente
+  de 16 bits.
 
-● Edit(/media/astral/5D0B-0163/esp_test/mlx_pkt.asm) (ctrl+o to expand)
+--------------------------------------------------------------------------------
+3. PROJETO DO DRIVER: O SKELETON (mlx_pkt.com)
+--------------------------------------------------------------------------------
+Para não reescrever a máquina de estado inteira da placa do zero, a estratégia
+deste projeto é se conectar ao ambiente FlexBoot (PXE/UNDI ROM) deixado na RAM
+pela própria placa Mellanox durante o POST da placa-mãe.
 
-  I will compile the driver skeleton using nasm to ensure there are no syntax errors in the Assembly code.
+O esqueleto Assembly gerado implementa a seguinte arquitetura:
+1. Estrutura Residente (TSR): O driver reserva espaço na memória baixa e se
+   hospeda no sistema sem ser sobrescrito pelo DOS.
+2. Assinatura Crynwr: Cadastra a string de Packet Driver padrão na Interrupção,
+   para que os clientes TCP/IP de DOS (como o mTCP) o reconheçam.
+3. Hook UNDI/PXE: Varre os segmentos de memória atrás da string mágica "!PXE".
+   Quando encontrada, intercepta a rotina de hardware oficial da Mellanox.
 
-● Bash(nasm -f bin mlx_pkt.asm -o mlx_pkt.com) (ctrl+o to expand)
+* Como compilar novos builds no Linux:
+  nasm -f bin mlx_pkt.asm -o mlx_pkt.com
 
-  Criei e compilei com sucesso o esqueleto do driver de rede em Assembly: **mlx_pkt.asm**. O executável mlx_pkt.com já está gerado na mesma pasta do pendrive (/media/astral/5D0B-0163/esp_test).
-
-  ### 📦 O que esse código faz:
-
-  1. Estrutura Residente (TSR): Reserva espaço seguro na memória baixa do DOS para manter o driver ativo após a execução.
-  2. Assinatura do Crynwr: Coloca a assinatura obrigatória 'PKT DRVR' no offset correto da interrupção (exigido por programas como o mTCP).
-  3. Mapeamento PXE/UNDI: Varre o segmento de memória do DOS em busca da assinatura !PXE deixada pela ROM FlexBoot da Mellanox ConnectX-3 e captura o ponto de entrada da API (EntryPointSP).
-  4. Instalação do Vetor: Registra a interrupção selecionada (padrão 0x60) na tabela de vetores de interrupção (IVT) do DOS.
-
-  ### 🚀 Como testar no seu MS-DOS:
-
-  Quando você iniciar seu PC MS-DOS, após o FlexBoot da Mellanox inicializar a placa de fibra, você pode carregar o driver executando:
-
-    CD \ESP_TEST
-    MLX_PKT.COM
-
-  Ele exibirá se encontrou a interface UNDI e o vetor de interrupção em que se instalou.
-
-  (Nota: Como este é o esqueleto, a função de transmissão send_pkt e recepção recv_pkt ainda precisam ser integradas com as chamadas estruturadas da especificação do PXE/UNDI, mas a infraestrutura base e a
-  comunicação com a ROM da Mellanox já estão 100% implementadas e compiladas!)
-
+================================================================================
+            FIM DO ARQUIVO - Projeto DOS-SANTOS
+================================================================================
