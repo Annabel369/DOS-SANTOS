@@ -1,0 +1,3 @@
+=== INSTALADOR DO MLX_PKT DRIVER (MELLANOX DOS) ===
+[-] ERRO: Interface PXE/UNDI nao encontrada na memoria.
+    Certifique-se de que o FlexBoot da Mellanox rodou no boot.

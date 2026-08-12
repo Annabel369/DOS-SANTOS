@@ -1,0 +1,25 @@
+=======================================================
+   MAPEA-MELLANOX - DETECTOR DE HARDWARE CONNECTX-3   
+=======================================================
+
+--- PCI CONFIGURATION SPACE ---
+Vendor ID:        0x15B3 (Mellanox)
+Device ID:        0x1007
+Command Register: 0x0406
+Status Register:  0x0010
+Class Code:       0x020000
+BAR 0 (Base MMIO):0xFC400000 (Size 1MB)
+BAR 2 (UAR/DB):   0xC0000000 (Size 8MB)
+Expansion ROM:    0xFC200000
+
+--- HCR (HOST COMMAND REGISTER) REGISTERS [Offset 0x80680] ---
+Input Parameter:  0x0000000000000000
+Input Modifier:   0x00000000
+Output Parameter: 0x0000000000000000
+Command Token:    0x0000
+Opcode:           0x526
+Opcode Modifier:  0x4
+Toggle Bit (T):   0
+Event Req (E):    0
+Go Bit (GO):      0 (Inativo/Software)
+Cmd Status:       0x63 (Erro)
