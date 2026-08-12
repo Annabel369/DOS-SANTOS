@@ -10,6 +10,10 @@ Este repositório contém:
 2. **Packet Driver Skeleton (`mlx_pkt.asm`)**: O esqueleto (TSR - Terminate and Stay Resident) do nosso driver genérico. Ele varre a memória em busca da assinatura `!PXE` deixada pela ROM da Mellanox e prepara a interrupção `0x60` (Padrão Crynwr) para interagir com o stack TCP/IP do DOS (como o mTCP).
 3. **DOS Serial & HTTP Test (`dos_ser.cpp` & `esp_send.cpp`)**: Programas em C++ (Borland C++ 3.1) para testar comunicações pela porta serial e envio de pacotes brutos.
 
+
+<img width="1080" height="992" alt="Gemini_Generated_Image_9vi9h69vi9h69vi9" src="https://github.com/user-attachments/assets/04453432-3f23-41ea-ab95-eba978490c9f" />
+ 
+
 ## 🛠️ Como Compilar
 Para compilar os arquivos em Assembly, utilize o **Netwide Assembler (NASM)** no Linux ou Windows:
 ```bash
